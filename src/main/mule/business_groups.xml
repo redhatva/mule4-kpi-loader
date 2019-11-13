@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+        <flow name="wf_Get_All_BGs" doc:id="ca135529-248a-4f55-8b36-5a98d006d3e4" >
+                <flow-ref doc:name="login" doc:id="370d8ec0-2ea0-497c-b3c7-639d42b4d2e7" name="LoginFlow"/>
+                <http:request method="GET" doc:name="Request" doc:id="80cdc217-598c-4154-b758-90428886075d" path="/accounts/api/organizations/{root_org_id}/hierarchy" config-ref="Anypoint_HTTP_Request_configuration">
+                        <http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.access_token
+}]]]></http:headers>
+                        <http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"root_org_id" : p('anypoint.platform.root_org_id')
+}]]]></http:uri-params>
+
+</http:request>
+                <ee:transform doc:name="Transform Message" doc:id="90bf301d-597f-4eec-a91b-e44119d6ff41" >
+                        <ee:message >
+                                <ee:set-payload resource="getallbusinessgroups.dwl" />
+
+</ee:message>
+                        <ee:variables >
+                                <ee:set-variable variableName="batch_result" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+                        </ee:variables>
+
+</ee:transform>
+		<parallel-foreach collection="#[payload]" maxConcurrency="20">
+		<!--  DO NOTHING UI/UX BUG IN STUDIO -->
+		<logger level="DEBUG" doc:name="PARALLEL-FOREACH" doc:id="2cb78c30-8fd6-4447-90f6-0ff0223e73ea" />
+		<!--  DO NOTHING -->
+
+                <choice doc:name="Environments" doc:id="f71b72b6-fba4-4847-95e0-153108251c47" >
+                        <when expression="vars.include_environments == true">
+                                <flow-ref doc:name="Flow Reference" doc:id="a810c174-1d96-43c0-ad75-b3d59c8069a1" name="wf_Get_BGenvironments" target="environment_info" targetValue="#[payload]" />
+                        </when>
+                        <otherwise >
+                                <ee:transform doc:name="Transform Message" doc:id="e2d4be5f-44db-499d-91c3-5f7e56c6c16d" >
+                                        <ee:message >
+                                        </ee:message>
+                                        <ee:variables >
+                                                <ee:set-variable variableName="environment_info" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+                                        </ee:variables>
+                                </ee:transform>
+                        </otherwise>
+                </choice>
+                <choice doc:name="Roles" doc:id="73d65e97-a29d-4bd1-82e8-a058d01c03bd" >
+                        <when expression="vars.include_roles == true">
+                                <flow-ref xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" doc:name="Flow Reference Roles" doc:id="55b6d7aa-7f4a-48b8-bd5f-2ac5800193c1" name="wf_Get_BGroles" target="active_directory" targetValue="#[payload]"/>
+                        </when>
+                        <otherwise >
+                                <ee:transform doc:name="Transform Message" doc:id="e392b9d0-19f2-4997-9ffd-d342bd808bbb" >
+                                        <ee:message >
+                                        </ee:message>
+                                        <ee:variables >
+                                                <ee:set-variable variableName="active_directory" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+                                        </ee:variables>
+                                </ee:transform>
+                        </otherwise>
+                </choice>
+                <choice doc:name="Usage" doc:id="4e8a9674-f439-492f-9eff-45160038e514" >
+                        <when expression="vars.include_usage == true">
+                                <flow-ref xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" doc:name="Flow Reference Usage" doc:id="2c1dd8cb-3a04-4cb8-94a0-ae8019ef683a" name="wf_Get_BGusage" target="bg_usage" targetValue="#[payload]"/>
+                        </when>
+                        <otherwise >
+                                <ee:transform doc:name="Transform Message" doc:id="32025d47-f102-43a2-b4cf-0e562f7f8023" >
+                                        <ee:message >
+                                        </ee:message>
+                                        <ee:variables >
+                                                <ee:set-variable variableName="bg_usage" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+                                        </ee:variables>
+                                </ee:transform>
+                        </otherwise>
+                </choice>
+
+                                        <ee:transform doc:name="Transform Message" doc:id="594da0c5-0da8-405d-9cfc-a2845079049f" >
+                                                <ee:message >
+                                                        <ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+
+        id: payload.id,
+        name: payload.name,
+        vCoresProduction_allocated: payload.vCoresProduction,
+        vCoresSandbox_allocated: payload.vCoresSandbox,
+		vCoresProduction_consumed: vars.bg_usage.vCoresProduction_consumed,
+        vCoresSandbox_consumed: vars.bg_usage.vCoresSandbox_consumed,
+        created_at: payload.created_at,
+        updated_at: payload.updated_at,
+        environments: vars.environment_info,
+        roles: vars.active_directory
+}]]></ee:set-payload>
+                                                </ee:message>
+                                        </ee:transform>
+        </parallel-foreach>
+                <ee:transform doc:name="Transform Message" doc:id="e89c85bc-52d8-43a8-8cc3-c365e8366f67" >
+                        <ee:message >
+                                <ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+total: sizeOf(payload),
+data: payload map $.payload
+}
+]]></ee:set-payload>
+                        </ee:message>
+                </ee:transform>
+        </flow>
+        <flow name="wf_Get_BGenvironments" doc:id="98fc1d0e-4ad4-4650-98b4-9087d9a704d2" >
+			<until-successful maxRetries="100" doc:name="Until Successful" doc:id="f8d8fd27-af80-4c7b-9010-e3edf94dd65b" millisBetweenRetries="15000">
+		<http:request method="GET" doc:name="Request" doc:id="41a1aa1d-a225-4b40-9e11-bfe04f1091e3" config-ref="Anypoint_HTTP_Request_configuration" path="/accounts/api/organizations/{org_id}/environments">
+                        <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.access_token
+}]]]></http:headers>
+                        <http:uri-params><![CDATA[#[output application/java
+---
+{
+	"org_id" : payload.id
+}]]]></http:uri-params>
+                
+</http:request>
+			</until-successful>
+                <ee:transform doc:name="Transform Message" doc:id="d5c04ea8-464e-43ea-bf72-5345b2f3c4fe" >
+                        <ee:message >
+                                <ee:set-payload resource="getBGenvironments.dwl" />
+
+</ee:message>
+                </ee:transform>
+                <error-handler >
+                        <on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="dd9ebff8-39fe-458b-bfca-33c6d9050517" >
+                                <logger level="INFO" doc:name="Logger" doc:id="846caf73-5590-422e-bae0-497fe85c0216" message="Failed to get environments for BG = #[payload]"/>
+                                <ee:transform doc:name="Transform Message" doc:id="ad00deed-5ad2-4659-b6f6-fa95fa666ebe" >
+                                        <ee:message >
+                                                <ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+[
+
+
+]]]></ee:set-payload>
+                                        </ee:message>
+                                </ee:transform>
+                        </on-error-continue>
+                </error-handler>
+        </flow>
+        <flow name="wf_Get_BGroles" doc:id="ebb14c3d-af35-45d6-b166-6c69eea34644" >
+			<until-successful maxRetries="100" doc:name="Until Successful" doc:id="bf213655-9eb5-41ba-87cc-3dae8ddf7f86" millisBetweenRetries="15000">
+		<http:request method="GET" doc:name="Request" doc:id="feb1b41e-7487-47f2-957c-50ce1c93d3f0" path="/accounts/api/organizations/{org_id}/rolegroups" config-ref="Anypoint_HTTP_Request_configuration">
+                        <http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.access_token
+}]]]></http:headers>
+                        <http:uri-params><![CDATA[#[output application/java
+---
+{
+	"org_id" : payload.id
+}]]]></http:uri-params>                
+</http:request>
+			</until-successful>
+                        <ee:transform doc:name="Transform Message" doc:id="5ecd0387-867e-4c6e-8bf0-a10f4c15206b">
+                        <ee:message>
+                                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload.data map {
+    role_name: $.name,
+    active_directory_group: $.external_names
+}
+
+]]></ee:set-payload>
+                        </ee:message>
+                </ee:transform>
+        </flow>
+	<flow name="wf_Get_BGusage" doc:id="0f9033ea-e088-42dc-9339-d32396710941" >
+			<until-successful maxRetries="100" doc:name="Until Successful" doc:id="33bdc4fe-c2ff-43aa-8e13-c77a559d890c" millisBetweenRetries="15000">
+		<http:request method="GET" doc:name="Request" doc:id="b3a333ac-08ea-474c-a696-0c80d1de6c75" config-ref="Anypoint_HTTP_Request_configuration" path="/cloudhub/api/organizations/{org_id}/usage">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.access_token
+}]]]></http:headers>
+			<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"org_id" : payload.id
+}]]]></http:uri-params>
+		</http:request>
+			</until-successful>
+		<ee:transform doc:name="Transform Message" doc:id="5dcf5180-3483-40dc-bcee-ca7f0a8de239">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+    vCoresProduction_consumed: payload.productionVCoresConsumed,
+    vCoresSandbox_consumed: payload.sandboxVCoresConsumed
+}
+
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+
+</mule>

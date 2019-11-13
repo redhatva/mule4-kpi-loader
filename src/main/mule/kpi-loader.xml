@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="dc6191af-9805-4699-9efb-871a857f297f" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="kpi-loaderFlow" doc:id="4aa969b4-145d-4c91-9e5b-4c8fd089b686" >
+		<http:listener doc:name="Listener" doc:id="b56c59cc-4b8a-4968-b93e-bd52bd36f412" config-ref="HTTP_Listener_config" path="/"/>
+<!-- 		<flow-ref doc:name="BG Data" doc:id="9bca38a4-d8ab-4628-8cd3-9f97f5f4a41b" name="wf_LoadDB_BGEnvRoles"/> -->
+		<flow-ref doc:name="App Data" doc:id="cae3131b-a2f2-43a2-af02-a5db297573ef" name="wf_Get_All_Apps"/>
+	</flow>
+</mule>

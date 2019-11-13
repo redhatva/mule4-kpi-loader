@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<flow name="wf_LoadDB_BGEnvRoles" doc:id="46a8807b-dc5c-4195-bf64-cad3abcc52ea" >
+        <ee:transform doc:name="Include Variables" doc:id="34f392cd-6df8-474b-9f4c-21b5ed282185">
+            <ee:message />
+            <ee:variables>
+                <ee:set-variable variableName="include_environments"><![CDATA[%dw 2.0
+output application/java
+---
+true]]></ee:set-variable>
+				<ee:set-variable variableName="include_roles" ><![CDATA[%dw 2.0
+output application/java
+---
+true]]></ee:set-variable>
+				<ee:set-variable variableName="include_usage" ><![CDATA[%dw 2.0
+output application/java
+---
+true]]></ee:set-variable>
+            
+</ee:variables>
+        </ee:transform>
+		<flow-ref doc:name="Get_All_BG_Data" doc:id="712d857a-9baf-4ec8-b337-76ef81e7f0d9" name="wf_Get_All_BGs" target="bgData"/>
+		<ee:transform doc:name="Transform Message" doc:id="8d681654-04f6-4e1a-9817-973be6d2f6fc" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="bgData" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.bgData.data]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="6378ccc0-c23e-4b62-ad62-74ee7694dbd0" collection="#[vars.bgData]">
+			<flow-ref doc:name="Insert Business Group" doc:id="c40cdb0a-9a7f-4880-933e-ff76b42c105d" name="wf_InsertBG" target="dbId" targetValue="#[payload.generatedKeys[0]]"/>
+			<flow-ref doc:name="Insert Environments" doc:id="7587fe00-8e29-45e4-9321-3139329db83d" name="wf_InsertEnv" target="envInsertResult"/>
+			<flow-ref doc:name="Insert Role Mappings" doc:id="8ce0dd66-3796-47db-8d37-1bbc9f7c9fed" name="wf_InsertRoles"/>
+		</foreach>
+	
+</flow>
+	<flow name="wf_InsertBG" doc:id="94a4e41a-130e-4212-9542-e93a539ecaca" >
+		<db:insert doc:name="Insert Business Group" doc:id="c5380100-f51b-41e5-93f1-102fbb20c82b" config-ref="Azure_KPI_Database_Config" autoGenerateKeys="true">
+			<db:sql >INSERT INTO BusinessGroup (EXT_ID, NAME, CREATED_AT, UPDATED_AT, OWNER, VC_PROD_ALLOCATED,
+	VC_PROD_USED ,
+	VC_SBOX_ALLOCATED ,
+	VC_SBOX_USED ,
+	VC_DESGN_ALLOCATED ,
+	VC_DESGN_USED)
+VALUES (:ext_id, :name, :created_at, :updated_at, :owner, :vc_prod_alloc, :vc_prod_used, :vc_sbox_alloc, :vc_sbox_used, :vc_desgn_alloc, :vc_desgn_used)
+</db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	ext_id: payload.id,
+	name: payload.name,
+	owner: "",
+	vc_prod_alloc: payload.vCoresProduction_allocated default 0, 
+	vc_prod_used: payload.vCoresProduction_consumed default 0, 
+	vc_sbox_alloc: payload.vCoresSandbox_allocated default 0, 
+	vc_sbox_used: payload.vCoresSandbox_consumed default 0, 
+	vc_desgn_alloc:0, 
+	vc_desgn_used:0,
+	created_at: payload.created_at,
+	updated_at: payload.updated_at
+}]]]></db:input-parameters>
+			<db:auto-generated-keys-column-names >
+				<db:auto-generated-keys-column-name value="id" />
+			</db:auto-generated-keys-column-names>
+		</db:insert>
+	</flow>
+	<flow name="wf_InsertEnv" doc:id="adf30e18-e39b-474f-99a2-94923be792aa" >
+		<db:bulk-insert doc:name="Bulk insert" doc:id="073cf869-001b-44d7-8f39-6d9d02a037f9" config-ref="Azure_KPI_Database_Config">
+			<db:bulk-input-parameters ><![CDATA[#[payload.environments map {
+	bg_id: vars.dbId,
+	ext_id: $.id,
+	name: $.name,
+	"type": ""
+}]]]></db:bulk-input-parameters>
+			<db:sql >INSERT INTO Environment (BG_ID, EXT_ID, NAME, TYPE) 
+VALUES (:bg_id, :ext_id, :name, :type)</db:sql>
+		</db:bulk-insert>
+	</flow>
+	<flow name="wf_InsertRoles" doc:id="ed0c3cc4-63ae-4bed-be3b-7487f37dd1ee" >
+		<ee:transform doc:name="Transform Message" doc:id="9ce98b44-72b5-4999-945a-50cfa1a17d2b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+flatten((payload.roles map ((r, rIdx) -> {
+    data: (r.active_directory_group) map ((ad, adIdx) -> {
+        name: r.role_name,
+        ad_group: ad
+    })
+})).data)]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<db:bulk-insert doc:name="Bulk insert" doc:id="16fa13a8-22b8-4ec8-a8d5-895eeebaf889" config-ref="Azure_KPI_Database_Config">
+			<db:bulk-input-parameters ><![CDATA[#[payload map {
+	bg_id: vars.dbId,
+	name: $.name,
+	ad_group: $.ad_group
+}]]]></db:bulk-input-parameters>
+			<db:sql >INSERT INTO RoleMapping (BG_ID, NAME, AD_GROUP)
+VALUES (:bg_id, :name, :ad_group)</db:sql>
+		</db:bulk-insert>
+	</flow>
+	<flow name="wf_InsertCHApps" doc:id="de85a795-1f7a-4af4-8a90-bf0a3e6054ba" >
+		<ee:transform doc:name="Transform Message" doc:id="46d90512-beb1-4ba5-99d4-54665974c71f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map {
+	bg_pkid: vars.bg_pkid,
+	env_pkid: vars.env_pkid,
+    id: $.id,
+    domain: $.domain,
+    full_domain: $.fullDomain,
+    href: $.href,
+    worker_status: $.status,
+    worker_count: $.workers,
+    worker_size: $.workerType match {
+        case workerType if workerType == "Micro" -> 0.1
+        case workerType if workerType == "Small" -> 0.2
+        case workerType if workerType == "Medium" -> 1
+        case workerType if workerType == "Large" -> 2
+        case workerType if workerType == "XLarge" -> 4
+        case workerType if workerType == "XXLarge" -> 8
+        case workerType if workerType == "4XLarge" -> 16
+        else -> 99
+    },
+    worker_version: $.muleVersion,
+    worker_region: $.region,
+    last_updated: ($.lastUpdateTime / 1000) as DateTime,
+    deployed_filename: $.filename,
+    deployment_group: $.deploymentGroupId,
+    static_ip: if ($.staticIPsEnabled == true) 1 else 0,
+    ip_addresses: if (isEmpty($.ipAddresses)) null else $.ipAddresses.address joinBy ",",
+    persistent_queue: if ($.persistentQueues == true) 1 else 0,
+    encrypted_queue: if ($.encryptedPersistentQueues == true) 1 else 0,
+    auto_restart: if ($.monitoringAutoRestart == true) 1 else 0,
+    logging_oob: if ($.loggingNgEnabled == true) 1 else 0,
+    logging_custom: if ($.loggingCustomLog4JEnabled == true) 1 else 0
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<db:bulk-insert doc:name="Bulk insert" doc:id="d273d93f-195b-42d5-b822-c8e1ad752edd" config-ref="Azure_KPI_Database_Config">
+			<db:sql >INSERT INTO CloudHubApplication (BG_ID, ENV_ID, EXT_ID, DOMAIN, FULL_DOMAIN)
+VALUES (:bg_pkid, :env_pkid, :id, :domain, :full_domain)
+</db:sql>
+		</db:bulk-insert>
+	</flow>
+	
+</mule>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+        <flow name="LoginFlow" doc:id="c659a667-cec0-40b1-b055-29800de0c2de" >
+                <choice doc:name="Choice" doc:id="1d3988ab-5cfd-41e8-857f-da736f56c45f" >
+                        <when expression="vars.access_token == null">
+                                <ee:transform doc:name="Transform Message" doc:id="76fc0433-76fa-485c-96ff-4781327199fb">
+                        <ee:message>
+                                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+        "username": p("anypoint.platform.username"),
+        "password": p("anypoint.platform.password")
+}]]></ee:set-payload>
+                        </ee:message>
+                </ee:transform>
+				<until-successful maxRetries="5" doc:name="Until Successful" doc:id="7cab1572-42cd-4384-8bef-b42500254b86" millisBetweenRetries="5000">
+                                <http:request method="POST" doc:name="Request" doc:id="62de1a21-d383-40d1-8a97-6befe5d2a729" path="/accounts/login" config-ref="Anypoint_HTTP_Request_configuration" />
+				</until-successful>
+
+                                <ee:transform doc:name="Transform Message" doc:id="3b0b2fa4-acfc-4cc5-ab69-82b56dcd63da">
+                        <ee:message>
+                        </ee:message>
+                        <ee:variables>
+                                <ee:set-variable variableName="access_token"><![CDATA[%dw 2.0
+output application/json
+---
+payload.access_token
+]]></ee:set-variable>
+                        </ee:variables>
+                </ee:transform>
+                        
+</when>
+                </choice>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="338f9579-d6df-403d-b81a-38086ab9e7e0" >
+				<logger level="ERROR" doc:name="Logger" doc:id="f31afc93-5c93-4320-a9ad-ac6713f04a76" message="************ FAILED TO LOG IN TO ANYPOINT PLATFORM **************** :: #[error]"/>
+			</on-error-propagate>
+		</error-handler>
+        
+</flow>
+	
+</mule>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="wf_Get_All_Apps" doc:id="56def8f0-efdf-49e2-a50d-799c0e693f9e" >
+		<flow-ref doc:name="Login" doc:id="20caf74f-8dcc-486d-ae62-5772f58a8433" name="LoginFlow"/>
+		<db:select doc:name="Retrieve All BG/Env IDs" doc:id="741cc696-798e-43e6-a716-32b15f250cba" config-ref="Azure_KPI_Database_Config">
+			<db:sql >select * from BusinessGroup_Environment</db:sql>
+		</db:select>
+		<foreach doc:name="For Each" doc:id="5410db44-c5b1-451b-9a8e-470cdb9e8321" >
+			<flow-ref doc:name="Get CH Apps" doc:id="bf5003ce-19f6-484e-a244-22c3219e1c77" name="wf_Get_All_CloudHubApps"/>
+		</foreach>
+	</flow>
+	<flow name="wf_Get_All_CloudHubApps" doc:id="337582fc-6c40-45e2-b77c-e02715d39d52" >
+		<ee:transform doc:name="Transform Message" doc:id="3ca1ef47-8484-40e2-838f-c3c467b61908" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="bg_id" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.BusinessGroup_External_ID]]></ee:set-variable>
+				<ee:set-variable variableName="env_id" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.Environment_External_ID]]></ee:set-variable>
+				<ee:set-variable variableName="bg_pkid" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.BusinessGroup_PKID]]></ee:set-variable>
+				<ee:set-variable variableName="env_pkid" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.Environment_PKID]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<http:request method="GET" doc:name="Get CH Apps by BG ENV" doc:id="1c6563bf-ce44-4071-b4df-6626862c3bb5" config-ref="Anypoint_HTTP_Request_configuration" path="/cloudhub/api/applications">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.access_token,
+	"X-ANYPNT-ORG-ID" : vars.bg_id,
+	"X-ANYPNT-ENV-ID" : vars.env_id
+}]]]></http:headers>
+		</http:request>
+		<flow-ref doc:name="Insert CHApp Data" doc:id="20b9cfcf-f0fd-405a-b9aa-83ffbc3b7cd3" name="wf_InsertCHApps"/>
+	</flow>
+</mule>
